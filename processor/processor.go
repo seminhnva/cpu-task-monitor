@@ -3,6 +3,7 @@ package processor
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -132,6 +133,39 @@ func GetTopProcesses(ctx context.Context) string {
 			mem.RamPercent,
 			mem.RunningTime)
 	}
-
+	ExportToCsv(cpuList, memList)
 	return output
+}
+
+func ExportToCsv(cpuList, memList []models.ProcStat) {
+	file, err := os.OpenFile("process_stat.csv", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("[Export To CSV]sCould not create CSV file: %v\n", err)
+		return
+	}
+	defer file.Close()
+	if stat, err := file.Stat(); err == nil && stat.Size() == 0 {
+		file.WriteString("Timestamp, PID, Name, CPU%, Memory(MB), RAM%, RunningTime\n")
+	}
+	timeStamp := time.Now().Format(time.RFC3339)
+	for _, cpu := range cpuList[:5] {
+		file.WriteString(fmt.Sprintf("%s, %d, %s, %.2f%%, %.2f, %.2f%%, %s\n",
+			timeStamp,
+			cpu.PID,
+			cpu.Name,
+			cpu.CPU,
+			float64(cpu.Memory)/(1024*1024),
+			cpu.RamPercent,
+			cpu.RunningTime))
+	}
+	for _, mem := range memList[:5] {
+		file.WriteString(fmt.Sprintf("%s, %d, %s, %.2f%%, %.2f, %.2f%%, %s\n",
+			timeStamp,
+			mem.PID,
+			mem.Name,
+			mem.CPU,
+			float64(mem.Memory)/(1024*1024),
+			mem.RamPercent,
+			mem.RunningTime))
+	}
 }
