@@ -27,7 +27,6 @@ func main() {
 	for _, monitor := range monitorLst {
 		wg.Add(1)
 		go processor.RunMonitor(ctx, &wg, statCh, monitor)
-		go processor.GetTopProcesses(ctx)
 	}
 	go func() {
 		for stat := range statCh {
@@ -45,6 +44,7 @@ func main() {
 				fmt.Printf("[%s]: %s\n", valStat.Name, valStat.Value)
 				models.StatMutex.Unlock()
 			}
+			fmt.Println(processor.GetTopProcesses(ctx))
 		}
 
 	}()

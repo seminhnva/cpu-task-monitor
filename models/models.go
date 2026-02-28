@@ -22,7 +22,7 @@ var (
 )
 
 type ProcStat struct {
-	ID          int32
+	PID         int32
 	Name        string
 	CPU         float64
 	Memory      uint64
