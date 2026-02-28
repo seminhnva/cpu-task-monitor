@@ -14,10 +14,12 @@ type CPUMonitor struct {
 func (m *CPUMonitor) Name() string {
 	return "CPU"
 }
-func (m *CPUMonitor) GetUsage(ctx context.Context) string {
+func (m *CPUMonitor) GetUsage(ctx context.Context) (string, bool) {
 	cpuStat, err := cpu.PercentWithContext(ctx, 1*time.Second, false)
-	if err != nil && len(cpuStat) == 0 {
-		return fmt.Sprintf("[CPU Monitor] Could not retrieve CPU info :%v\n ", err)
+	if err != nil || len(cpuStat) == 0 {
+		return fmt.Sprintf("[CPU Monitor] Could not retrieve CPU info :%v\n ", err), false
 	}
-	return fmt.Sprintf("%.2f%%", cpuStat[0])
+
+	value := fmt.Sprintf("%.2f%%", cpuStat[0])
+	return value, cpuStat[0] > 60
 }

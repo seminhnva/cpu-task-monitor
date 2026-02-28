@@ -2,10 +2,7 @@ module github.com/seminhnva/cpu-task-monitor
 
 go 1.25.6
 
-require (
-	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/shirou/gopsutil/v4 v4.26.1
-)
+require github.com/shirou/gopsutil/v4 v4.26.1
 
 require (
 	github.com/ebitengine/purego v0.9.1 // indirect

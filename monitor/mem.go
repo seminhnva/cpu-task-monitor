@@ -14,10 +14,11 @@ func (m *MemoryMonitor) Name() string {
 	return "Memory"
 }
 
-func (m *MemoryMonitor) GetUsage(ctx context.Context) string {
+func (m *MemoryMonitor) GetUsage(ctx context.Context) (string, bool) {
 	vmStat, err := mem.VirtualMemoryWithContext(ctx)
 	if err != nil {
-		return fmt.Sprintf("[Memory Monitor] Could not retrieve memory info :%v\n ", err)
+		return fmt.Sprintf("[Memory Monitor] Could not retrieve memory info :%v\n ", err), false
 	}
-	return fmt.Sprintf("%.2f%%", vmStat.UsedPercent)
+	value := fmt.Sprintf("%.2f%%", vmStat.UsedPercent)
+	return value, vmStat.UsedPercent > 60
 }

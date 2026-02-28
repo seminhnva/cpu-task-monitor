@@ -13,7 +13,7 @@ type SystemStat struct {
 
 type Monitor interface {
 	Name() string
-	GetUsage(ctx context.Context) string
+	GetUsage(ctx context.Context) (string, bool)
 }
 
 var (

@@ -24,9 +24,14 @@ func RunMonitor(ctx context.Context, wg *sync.WaitGroup, statCh chan models.Syst
 			fmt.Printf("Monitor stopped: %s\n", monitor.Name())
 			return
 		case <-ticker.C:
-			statCh <- models.SystemStat{
+			value, alert := monitor.GetUsage(ctx)
+			stat := models.SystemStat{
 				Name:  monitor.Name(),
-				Value: monitor.GetUsage(ctx),
+				Value: value,
+			}
+			statCh <- stat
+			if alert {
+				LogAlert(stat)
 			}
 		}
 	}
@@ -168,4 +173,18 @@ func ExportToCsv(cpuList, memList []models.ProcStat) {
 			mem.RamPercent,
 			mem.RunningTime))
 	}
+}
+
+func LogAlert(stat models.SystemStat) {
+	models.StatMutex.Lock()
+	defer models.StatMutex.Unlock()
+
+	file, err := os.OpenFile("alert.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("[Log Alert] Could not create alert log file: %v\n", err)
+		return
+	}
+	defer file.Close()
+	logLine := fmt.Sprintf("[%s] ALERT :%s = %s\n", time.Now().Format(time.RFC3339), stat.Name, stat.Value)
+	file.WriteString(logLine)
 }
