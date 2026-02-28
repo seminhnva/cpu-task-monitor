@@ -21,7 +21,7 @@ func (m *DiskMonitor) GetUsage(ctx context.Context) string {
 	}
 	diskStat, err := disk.UsageWithContext(ctx, path)
 	if err != nil {
-		return "N/A"
+		return fmt.Sprintf("[Disk Monitor] Could not retrieve disk info :%v\n ", err)
 	}
 	return fmt.Sprintf("%.2f%%", diskStat.UsedPercent)
 }

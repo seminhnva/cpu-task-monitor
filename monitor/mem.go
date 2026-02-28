@@ -17,7 +17,7 @@ func (m *MemoryMonitor) Name() string {
 func (m *MemoryMonitor) GetUsage(ctx context.Context) string {
 	vmStat, err := mem.VirtualMemoryWithContext(ctx)
 	if err != nil {
-		return "N/A"
+		return fmt.Sprintf("[Memory Monitor] Could not retrieve memory info :%v\n ", err)
 	}
 	return fmt.Sprintf("%.2f%%", vmStat.UsedPercent)
 }

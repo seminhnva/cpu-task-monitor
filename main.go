@@ -27,6 +27,7 @@ func main() {
 	for _, monitor := range monitorLst {
 		wg.Add(1)
 		go processor.RunMonitor(ctx, &wg, statCh, monitor)
+		go processor.GetTopProcesses(ctx)
 	}
 	go func() {
 		for stat := range statCh {
