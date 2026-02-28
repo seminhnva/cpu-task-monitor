@@ -37,14 +37,20 @@ func main() {
 	}()
 	printTicker := time.NewTicker(3 * time.Second)
 	go func() {
-		for range printTicker.C {
-			fmt.Println("=== System status ===")
-			for _, valStat := range models.Stats {
+		defer printTicker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-printTicker.C:
+				fmt.Println("=== System status ===")
 				models.StatMutex.Lock()
-				fmt.Printf("[%s]: %s\n", valStat.Name, valStat.Value)
+				for _, valStat := range models.Stats {
+					fmt.Printf("[%s]: %s\n", valStat.Name, valStat.Value)
+				}
 				models.StatMutex.Unlock()
+				fmt.Println(processor.GetTopProcesses(ctx))
 			}
-			fmt.Println(processor.GetTopProcesses(ctx))
 		}
 
 	}()
@@ -52,5 +58,4 @@ func main() {
 	cancel()
 	wg.Wait()
 	close(statCh)
-	printTicker.Stop()
 }

@@ -48,61 +48,80 @@ func GetTopProcesses(ctx context.Context) string {
 	if err != nil {
 		return fmt.Sprintf("[GetTopProcesses] Could not retrieve process info :%v\n ", err)
 	}
-	var wg sync.WaitGroup
-	var cpuList, memList []models.ProcStat
-	procChan := make(chan models.ProcStat, len(processes))
 
-	for _, proc := range processes {
+	jobs := make(chan *process.Process)
+	results := make(chan models.ProcStat, len(processes))
+	workerCount := 20
+	var wg sync.WaitGroup
+
+	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		go func(proc *process.Process) {
+		go func() {
 			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case proc, ok := <-jobs:
+					if !ok {
+						return
+					}
+					name, err := proc.NameWithContext(ctx)
+					if err != nil {
+						continue
+					}
+					cpuPercent, err := proc.CPUPercentWithContext(ctx)
+					if err != nil {
+						continue
+					}
+					memInfo, err := proc.MemoryInfoWithContext(ctx)
+					if err != nil {
+						continue
+					}
+					ramPercent := float64(memInfo.RSS) / float64(totalMemory) * 100
+
+					if cpuPercent < 1 && ramPercent < 1 {
+						continue
+					}
+
+					createTime, ererr := proc.CreateTimeWithContext(ctx) // miliseconds
+					if ererr != nil {
+						continue
+					}
+
+					runningTime := time.Since(time.Unix(createTime/1000, 0))
+					procStat := models.ProcStat{
+						PID:         proc.Pid,
+						Name:        name,
+						CPU:         cpuPercent,
+						Memory:      memInfo.RSS,
+						RamPercent:  ramPercent,
+						RunningTime: runningTime,
+					}
+					results <- procStat
+
+				}
+			}
+
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, proc := range processes {
 			select {
 			case <-ctx.Done():
 				return
-			default:
+			case jobs <- proc:
 			}
-			name, err := proc.NameWithContext(ctx)
-			if err != nil {
-				return
-			}
-			cpuPercent, err := proc.CPUPercentWithContext(ctx)
-			if err != nil {
-				return
-			}
-			memInfo, err := proc.MemoryInfoWithContext(ctx)
-			if err != nil {
-				return
-			}
-			ramPercent := float64(memInfo.RSS) / float64(totalMemory) * 100
-
-			if cpuPercent < 1 || ramPercent < 1 {
-				return
-			}
-
-			createTime, ererr := proc.CreateTimeWithContext(ctx) // miliseconds
-			if ererr != nil {
-				return
-			}
-
-			runningTime := time.Since(time.Unix(createTime/1000, 0))
-			procStat := models.ProcStat{
-				PID:         proc.Pid,
-				Name:        name,
-				CPU:         cpuPercent,
-				Memory:      memInfo.RSS,
-				RamPercent:  ramPercent,
-				RunningTime: runningTime,
-			}
-			procChan <- procStat
-		}(proc)
-	}
-
+		}
+	}()
 	go func() {
 		wg.Wait()
-		close(procChan)
+		close(results)
 	}()
 
-	for stat := range procChan {
+	var cpuList, memList []models.ProcStat
+	for stat := range results {
 		if stat.CPU > 1 {
 			cpuList = append(cpuList, stat)
 		}
@@ -117,7 +136,7 @@ func GetTopProcesses(ctx context.Context) string {
 		return memList[i].RamPercent > memList[j].RamPercent
 	})
 	output += "====== Top CPU consuming processes =====\n"
-	for i, cpu := range cpuList[:5] {
+	for i, cpu := range cpuList[:min(5, len(cpuList))] {
 		output += fmt.Sprintf("%d.[%d] %s CPU: %.2f%%, RAM: %.2f MB( %.2f%%), Running Time: %s\n",
 			i+1,
 			cpu.PID,
@@ -128,7 +147,7 @@ func GetTopProcesses(ctx context.Context) string {
 			cpu.RunningTime)
 	}
 	output += "====Top RAM consuming processes ===\n"
-	for i, mem := range memList[:5] {
+	for i, mem := range memList[:min(5, len(memList))] {
 		output += fmt.Sprintf("%d.[%d] %s CPU: %.2f%%, RAM: %.2f MB( %.2f%%), Running Time: %s\n",
 			i+1,
 			mem.PID,
@@ -153,7 +172,7 @@ func ExportToCsv(cpuList, memList []models.ProcStat) {
 		file.WriteString("Timestamp, PID, Name, CPU%, Memory(MB), RAM%, RunningTime\n")
 	}
 	timeStamp := time.Now().Format(time.RFC3339)
-	for _, cpu := range cpuList[:5] {
+	for _, cpu := range cpuList[:min(5, len(cpuList))] {
 		file.WriteString(fmt.Sprintf("%s, %d, %s, %.2f%%, %.2f, %.2f%%, %s\n",
 			timeStamp,
 			cpu.PID,
@@ -163,7 +182,7 @@ func ExportToCsv(cpuList, memList []models.ProcStat) {
 			cpu.RamPercent,
 			cpu.RunningTime))
 	}
-	for _, mem := range memList[:5] {
+	for _, mem := range memList[:min(5, len(memList))] {
 		file.WriteString(fmt.Sprintf("%s, %d, %s, %.2f%%, %.2f, %.2f%%, %s\n",
 			timeStamp,
 			mem.PID,
